@@ -10,6 +10,11 @@ if len(sys.argv) >= 3:
     video.open(sys.argv[2], cv2.cv.CV_FOURCC(*'MJPG'), 15, (1280, 720))
     print(video.isOpened())
 
+
+#import calibrate
+#calibrate.calibrate(sys.argv[1])
+
+
 class Ball:
     def __init__(self, color = (255, 0, 0), id = 0):
         '''Initializing the ball object, mostly with empty data'''
