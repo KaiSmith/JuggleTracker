@@ -11,7 +11,7 @@ def inRange(crange, fdata, bgdata):
     return (float(featinrange)/len(fdata), float(featinrange)/(featinrange + bginrange))
 
 
-def calibrate(filename, minfeat = .5, minratio = .5):
+def calibrate(filename, mode, minfeat = .5, minratio = .5):
     clicks = []
     rclicks = []
     featuredata = []
@@ -63,6 +63,11 @@ def calibrate(filename, minfeat = .5, minratio = .5):
                     if math.sqrt((rclicks[c*2][0]-x)**2+(rclicks[c*2][1]-y)**2) < rclicks[c*2+1]:
                         break
                 backgrounddata.append(p)
+    
+    cv2.destroyAllWindows()
+    if mode == 1:
+        return [[min([x[0] for x in featuredata]), min([x[1] for x in featuredata]), min([x[2] for x in featuredata])],
+                [max([x[0] for x in featuredata]), max([x[1] for x in featuredata]), max([x[2] for x in featuredata])]]
 
     #Seperate feature data by clustering hues
     #NOTE: Currently assumes only one color
@@ -87,7 +92,7 @@ def calibrate(filename, minfeat = .5, minratio = .5):
     #pplot.show()
 
     #Expand a region around the centroid to optimize feature detection
-    '''for c, cg in zip(centroids, colorgroups):
+    for c, cg in zip(centroids, colorgroups):
         colorrange = [[c[0]-2, c[1]-2, c[2]-2],[c[0]+2, c[1]+2, c[2]+2]]
         pf, ps = inRange(colorrange, featuredata, backgrounddata)
         while pf < minfeat:
@@ -111,8 +116,5 @@ def calibrate(filename, minfeat = .5, minratio = .5):
                 pf = pf3
             print(colorrange)
             t = cv2.inRange(img, np.array(colorrange[0], dtype = np.uint8), np.array(colorrange[1], dtype = np.uint8))
-            cv2.imshow("Calibration", t)'''
-    cv2.destroyAllWindows()
-    colorrange = [[min([x[0] for x in featuredata]), min([x[1] for x in featuredata]), min([x[2] for x in featuredata])],
-            [max([x[0] for x in featuredata]), max([x[1] for x in featuredata]), max([x[2] for x in featuredata])]]
+            cv2.imshow("Calibration", t)
     return colorrange
