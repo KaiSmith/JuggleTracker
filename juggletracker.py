@@ -11,9 +11,9 @@ if len(sys.argv) >= 3:
     print(video.isOpened())
 
 
-#import calibrate
-#calibrate.calibrate(sys.argv[1])
-
+import calibrate
+colorrange = calibrate.calibrate(sys.argv[1])
+print(colorrange)
 
 class Ball:
     def __init__(self, color = (255, 0, 0), id = 0):
@@ -173,7 +173,8 @@ def updateBalls(frame, blobs, balls):
 
         #If ball was not accounted for and other conditions are met, assume that the ball was caught and the hand is covering the ball.
         for ball in p.balls:
-            if ball.times[-1] != frame and ball.dy[-1][1] > 0 and ball.thrown == True:
+            if ball.times[-1] != frame and ball.thrown == True and (ball.dy[-1][1] > 0 or\
+                    (abs(float(ball.dx[-1][1])/ball.dy[-1][1]) <= 2 and abs(ball.dx[-1][1]) >= 10)):
                 ball.thrown = False
                 ball.catches += 1
 
@@ -185,7 +186,8 @@ while(1):
     b = cv2.GaussianBlur(f,(5,5),10)
     #Filters by color
     hsv = cv2.cvtColor(b,cv2.COLOR_BGR2HSV)
-    thresh = cv2.inRange(hsv,np.array([7, 80, 200],np.uint8),np.array([25, 255, 255],np.uint8))
+    thresh = cv2.inRange(hsv,np.array([6, 77, 180],np.uint8),np.array([25, 255, 255],np.uint8))
+    #thresh = cv2.inRange(hsv,np.array(colorrange[0],np.uint8),np.array(colorrange[1],np.uint8))
     #Attempts to remove background contours
     kernel = np.ones((5, 5), np.uint8)
     thresh = cv2.erode(thresh, kernel, iterations = 2)

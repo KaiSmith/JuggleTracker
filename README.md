@@ -7,9 +7,15 @@
 
 ###Other Goals
 * Real time juggling analysis
-* Features which would help generalize the program
-  * Background subtraction
-  * Ball color calibration
+* Background subtraction
+* Ball color calibration
+  * Works by making circles of regions to get the color of and regions to ignore.
+  * Click once to set the center of the circle and then click again to set the radius.
+    * Left clicking means you want to get the colors in the circle.
+    * Right clicking means to ignore the area in the circle when considering background colors. Primarily used to circle partially covered balls when doing a smart color matching algorithm.
+  * Types of color selecting algorithms:
+    * Naive: Uses smallest rectangle possible to capture EVERY point circled. Prone to also picking up backgroud of similar color.
+    * Smart: Tries to fit the rectangle to include as many circled points as possible and s little background as possible.
 * Non-ball props
 
 ##Hurdles
