@@ -20,8 +20,7 @@ class Ball:
         self.catches = 0
         self.hands = []
         self.lost = False
-
-    
+   
     def update(self, frame, center):
         '''After choosing the correct new center for the ball, this function updates the kinetics of the ball (position, velocity, etc.)'''
         self.times.append(frame)
@@ -106,8 +105,10 @@ class Pattern:
         for n, ball in enumerate(self.balls):
             #Chooses biggest blobs for initial values.
             if len(ball.times) == 0:
-                ball.update(frame, blobs[n])
-                continue
+                if n < len(blobs):
+                    ball.update(frame, blobs[n])
+                else:
+                    ball.update(frame, (640, 390))
             d = [dist(ball.predict(), blob) for blob in blobs]
             [cv2.circle(f, (int(ball.predict(t)[0]), int(ball.predict(t)[1])), 3, (0, 255, 0), thickness = 3, lineType = 8, shift = 0)\
                     for t in [1.5]]
