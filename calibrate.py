@@ -10,7 +10,7 @@ def inRange(crange, fdata, bgdata):
     print(len(fdata), featinrange, len(bgdata), bginrange)
     return (float(featinrange)/len(fdata), float(featinrange)/(featinrange + bginrange))
 
-def calibrate(filename, mode, minfeat = .5, minratio = .5):
+def calibrate(filename, mode, minfeat = .8, minratio = .5):
     clicks = []
     rclicks = []
     featuredata = []

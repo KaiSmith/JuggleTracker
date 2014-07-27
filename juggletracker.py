@@ -27,10 +27,10 @@ class Ball:
         self.positions.append(center)
         dx, dy, times = self.dx, self.dy, self.times
         dx2, dy2 = self.dx2, self.dy2
-        if len(self.positions) >= 2:
+        if len(self.times) >= 2:
             dx.append([(times[-1]+times[-2])/2.0, float(self.positions[-1][0]-self.positions[-2][0])/(times[-1]-times[-2])])
             dy.append([(times[-1]+times[-2])/2.0, float(self.positions[-1][1]-self.positions[-2][1])/(times[-1]-times[-2])])
-        if len(self.positions) >= 3:
+        if len(self.times) >= 3:
             dx2.append([(dx[-1][0]+dx[-2][0])/2.0, float(dx[-1][1]-dx[-2][1])/(dx[-1][0]-dx[-2][0])])
             dy2.append([(dy[-1][0]+dy[-2][0])/2.0, float(dy[-1][1]-dy[-2][1])/(dy[-1][0]-dy[-2][0])])
 
@@ -40,7 +40,7 @@ class Ball:
     def predict(self, dt = 1.5):
         '''This function uses the ball's kinetic data to predict its position in the next frame, which is used for tracking the balls'''
         #dt = frame-self.times[-1]+.5
-        if len(self.times) == 1:
+        if len(self.times) <= 1:
             return self.positions[-1]
         if len(self.times) == 2:
             return (self.positions[-1][0]+self.dx[-1][1]*dt, self.positions[-1][1]+self.dy[-1][1]*dt)
@@ -94,6 +94,7 @@ class Pattern:
     def __init__(self, balls):
         '''Initializes the pattern's data'''
         self.balls = balls
+        self.active = []
         self.n = len(balls)
         self.oldsnapshot = [True, True, True]
         self.throworder = []
@@ -102,13 +103,7 @@ class Pattern:
     def updateBalls(self, frame, blobs):
         '''Matches each ball with a new contour'''
         scores = []
-        for n, ball in enumerate(self.balls):
-            #Chooses biggest blobs for initial values.
-            if len(ball.times) == 0:
-                if n < len(blobs):
-                    ball.update(frame, blobs[n])
-                else:
-                    ball.update(frame, (640, 390))
+        for n, ball in enumerate(self.active):
             d = [dist(ball.predict(), blob) for blob in blobs]
             [cv2.circle(f, (int(ball.predict(t)[0]), int(ball.predict(t)[1])), 3, (0, 255, 0), thickness = 3, lineType = 8, shift = 0)\
                     for t in [1.5]]
@@ -116,23 +111,33 @@ class Pattern:
 
         #Matches each ball to new center by taking the overall minimum scores and matching those first.
         if len(scores) > 0:
-            for d in range(min(len(self.balls), len(blobs))):
-                b = min(scores)
-                n = scores.index(b)
-                if dist(self.balls[n/len(blobs)].predict(), blobs[n%len(blobs)]) < 100*(frame-self.balls[n/len(blobs)].times[-1]+1):
-                    self.balls[n/len(blobs)].update(frame, blobs[n%len(blobs)])
+            for d in range(min(len(self.active), len(blobs))):
+                best_match = min(scores)
+                n = scores.index(best_match)
+                c = 100*(frame-self.active[n/len(blobs)].times[-1]+1)
+                if dist(self.active[n/len(blobs)].predict(), blobs[n%len(blobs)]) < c:
+                    self.active[n/len(blobs)].update(frame, blobs[n%len(blobs)])
+                    blobs[n%len(blobs)] = None
                 else:
-                    self.balls[n/len(blobs)].lost = True
+                    self.active[n/len(blobs)].lost = True
                 for s in range(len(scores)):
                     if s/len(blobs) == n/len(blobs) or s%len(blobs) == n%len(blobs):
                         scores[s] = 10000
 
             #If ball was not accounted for and other conditions are met, assume that the ball was caught and the hand is covering the ball.
-            for ball in self.balls:
-                if ball.times[-1] != frame and ball.thrown == True and (ball.dy[-1][1] > 0 or\
-                        (abs(float(ball.dx[-1][1])/ball.dy[-1][1]) <= 2 and abs(ball.dx[-1][1]) >= 10)):
+            for ball in self.active:
+                if  ball.times[-1] != frame and ball.thrown == True and (ball.dy[-1][1] > 0):# or\
+                        #(abs(float(ball.dx[-1][1])/ball.dy[-1][1]) <= 2 and abs(ball.dx[-1][1]) >= 10)):
                     ball.thrown = False
                     ball.catches += 1
+
+        #Chooses biggest blobs for initial values.
+        blobs = filter(lambda x: x != None, blobs)
+        balls = filter(lambda x: len(x.times) == 0,self.balls)
+        for n, ball in enumerate(balls):
+            if n < len(blobs):
+                ball.update(frame, blobs[n])
+                self.active.append(self.balls[n])
 
     def catches(self):
         '''Returns the total number of catches in the pattern'''
@@ -194,7 +199,7 @@ if __name__ == '__main__':
         colorrange = calibrate.calibrate(options.input, mode)
         print('Color range used (in HSV with scales of 180, 255, and 255 respectively): '+ str(colorrange))
     else:
-        colorrange = [[6, 77, 180],[25, 255, 255]]
+        colorrange = [[6, 128, 181], [14, 240, 253]]#[[6, 77, 180],[25, 255, 255]]
     
     balls = [Ball((255, 0, 0), 1), Ball((0, 0, 255), 2), Ball((255, 0, 255), 3)]
 
@@ -211,8 +216,8 @@ if __name__ == '__main__':
         thresh = cv2.inRange(hsv,np.array(colorrange[0],np.uint8),np.array(colorrange[1],np.uint8))
         #Attempts to remove background contours
         kernel = np.ones((5, 5), np.uint8)
-        thresh = cv2.erode(thresh, kernel, iterations = 2)
-        thresh = cv2.dilate(thresh, kernel, iterations = 3)
+        #thresh = cv2.erode(thresh, kernel, iterations = 2)
+        #thresh = cv2.dilate(thresh, kernel, iterations = 3)
         t = np.copy(thresh)
         #Finds contours in thresholded image
         contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
