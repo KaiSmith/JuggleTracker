@@ -10,7 +10,6 @@ def inRange(crange, fdata, bgdata):
     print(len(fdata), featinrange, len(bgdata), bginrange)
     return (float(featinrange)/len(fdata), float(featinrange)/(featinrange + bginrange))
 
-
 def calibrate(filename, mode, minfeat = .5, minratio = .5):
     clicks = []
     rclicks = []
@@ -102,11 +101,11 @@ def calibrate(filename, mode, minfeat = .5, minratio = .5):
                 [colorrange[1][0], min(colorrange[1][1]+2, 255), colorrange[1][2]]], featuredata, backgrounddata)
             pf3, ps3 = inRange([[colorrange[0][0], colorrange[0][1], max(colorrange[0][2]-2, 0)],
                 [colorrange[1][0], colorrange[1][1], min(colorrange[1][2]+2, 255)]], featuredata, backgrounddata)
-            if ps1 >= ps2 and ps1 >= ps3:
+            if pf1 >= pf2 and pf1 >= pf3:
                 colorrange[0][0] = max(colorrange[0][0]-2, 0)
                 colorrange[1][0] = min(colorrange[1][0]+2, 180)
                 pf = pf1
-            elif ps2 >= ps1 and ps2 >= ps3:
+            elif pf2 >= pf1 and pf2 >= pf3:
                 colorrange[0][1] = max(colorrange[0][1]-2, 0)
                 colorrange[1][1] = min(colorrange[1][1]+2, 255)
                 pf = pf2

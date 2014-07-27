@@ -100,11 +100,44 @@ class Pattern:
         self.throworder = []
         self.siteswap = []
 
+    def updateBalls(self, frame, blobs):
+        '''Matches each ball with a new contour'''
+        scores = []
+        for n, ball in enumerate(self.balls):
+            #Chooses biggest blobs for initial values.
+            if len(ball.times) == 0:
+                ball.update(frame, blobs[n])
+                continue
+            d = [dist(ball.predict(), blob) for blob in blobs]
+            [cv2.circle(f, (int(ball.predict(t)[0]), int(ball.predict(t)[1])), 3, (0, 255, 0), thickness = 3, lineType = 8, shift = 0)\
+                    for t in [1.5]]
+            scores.extend(d)
+
+        #Matches each ball to new center by taking the overall minimum scores and matching those first.
+        if len(scores) > 0:
+            for d in range(min(len(self.balls), len(blobs))):
+                b = min(scores)
+                n = scores.index(b)
+                if dist(self.balls[n/len(blobs)].predict(), blobs[n%len(blobs)]) < 100*(frame-self.balls[n/len(blobs)].times[-1]+1):
+                    self.balls[n/len(blobs)].update(frame, blobs[n%len(blobs)])
+                else:
+                    self.balls[n/len(blobs)].lost = True
+                for s in range(len(scores)):
+                    if s/len(blobs) == n/len(blobs) or s%len(blobs) == n%len(blobs):
+                        scores[s] = 10000
+
+            #If ball was not accounted for and other conditions are met, assume that the ball was caught and the hand is covering the ball.
+            for ball in self.balls:
+                if ball.times[-1] != frame and ball.thrown == True and (ball.dy[-1][1] > 0 or\
+                        (abs(float(ball.dx[-1][1])/ball.dy[-1][1]) <= 2 and abs(ball.dx[-1][1]) >= 10)):
+                    ball.thrown = False
+                    ball.catches += 1
+
     def catches(self):
         '''Returns the total number of catches in the pattern'''
         return sum(map(lambda x: x.catches, self.balls))
 
-    def update(self, on_catch = True):
+    def updateSiteswap(self, on_catch = True):
         '''Updates the siteswap based on new catches or throws'''
         snapshot = map(lambda x: x.thrown, self.balls)
         for i in range(self.n):
@@ -126,6 +159,10 @@ class Pattern:
         '''Draws the current siteswap at the bottom of the screen'''
         cv2.putText(f, 'Siteswap: '+str(''.join(map(str,self.siteswap))), (0,700), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2)
 
+def dist(ball, blob):
+        '''Calculates Euclidean distance'''
+        return math.sqrt((ball[0]-blob[0])**2+(ball[1]-blob[1])**2)
+
 if __name__ == '__main__':
     import sys
     from optparse import OptionParser
@@ -136,6 +173,8 @@ if __name__ == '__main__':
             dest = 'output', default = None)
     parser.add_option('-c', '--calibrate', help = 'Method of calibration to be used. Options are "naive" (can also use "1"),\
             or "smart" (can also use "2"). If none is used, the default orange color will be used for now.', dest = 'cal', default = None)
+    parser.add_option('-b', '--balls', help = 'The numebr of balls that will be juggled. Default is 3',
+            dest = 'balls', default = 3, type = 'int')
 
     (options, args) = parser.parse_args(sys.argv)
     
@@ -152,50 +191,13 @@ if __name__ == '__main__':
         if options.cal.lower() in ['smart', '2']:
             mode = 2
         colorrange = calibrate.calibrate(options.input, mode)
-        print('Color range used (in HSV with scales of 100, 255, and 255 respectively): '+ str(colorrange))
+        print('Color range used (in HSV with scales of 180, 255, and 255 respectively): '+ str(colorrange))
     else:
         colorrange = [[6, 77, 180],[25, 255, 255]]
     
     balls = [Ball((255, 0, 0), 1), Ball((0, 0, 255), 2), Ball((255, 0, 255), 3)]
 
     p = Pattern(balls)
-
-    def dist(ball, blob):
-        '''Calculates Euclidean distance'''
-        return math.sqrt((ball[0]-blob[0])**2+(ball[1]-blob[1])**2)
-
-    def updateBalls(frame, blobs, balls):
-        '''Matches each ball with a new contour'''
-        scores = []
-        for n, ball in enumerate(balls):
-            #Chooses biggest blobs for initial values.
-            if len(ball.times) == 0:
-                ball.update(frame, blobs[n])
-                continue
-            d = [dist(ball.predict(), blob) for blob in blobs]
-            [cv2.circle(f, (int(ball.predict(t)[0]), int(ball.predict(t)[1])), 3, (0, 255, 0), thickness = 3, lineType = 8, shift = 0)\
-                    for t in [1.5]]
-            scores.extend(d)
-
-        #Matches each ball to new center by taking the overall minimum scores and matching those first.
-        if len(scores) > 0:
-            for d in range(min(len(balls), len(blobs))):
-                b = min(scores)
-                n = scores.index(b)
-                if dist(balls[n/len(blobs)].predict(), blobs[n%len(blobs)]) < 100*(frame-balls[n/len(blobs)].times[-1]+1):
-                    balls[n/len(blobs)].update(frame, blobs[n%len(blobs)])
-                else:
-                    balls[n/len(blobs)].lost = True
-                for s in range(len(scores)):
-                    if s/len(blobs) == n/len(blobs) or s%len(blobs) == n%len(blobs):
-                        scores[s] = 10000
-
-            #If ball was not accounted for and other conditions are met, assume that the ball was caught and the hand is covering the ball.
-            for ball in p.balls:
-                if ball.times[-1] != frame and ball.thrown == True and (ball.dy[-1][1] > 0 or\
-                        (abs(float(ball.dx[-1][1])/ball.dy[-1][1]) <= 2 and abs(ball.dx[-1][1]) >= 10)):
-                    ball.thrown = False
-                    ball.catches += 1
 
     frame = 0
     while(1):
@@ -219,8 +221,8 @@ if __name__ == '__main__':
         M = [cv2.moments(c)for c in bc]
         centers = [(int(m['m10']/m['m00']), int(m['m01']/m['m00'])) for m in M]
         centers = [c for c in centers if c[0]>350] #NOTE: This is only temporary until some sort of background subtraction can be implemented.
-        updateBalls(frame, centers, balls)
-        p.update()
+        p.updateBalls(frame, centers)
+        p.updateSiteswap()
         cv2.imshow('Video', f)
         if options.output != None:
             video.write(f)
