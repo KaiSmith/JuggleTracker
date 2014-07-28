@@ -3,15 +3,11 @@ import numpy as np
 import math
 from scipy.cluster.vq import kmeans2
 
-def inRange(crange, fdata, bgdata):
-    featinrange = sum(cv2.inRange(np.array([fdata], dtype=np.uint8), np.array(crange[0], dtype=np.uint8),
-        np.array(crange[1], dtype=np.uint8))[0])/255
-    # bginrange = sum(cv2.inRange(np.array([bgdata], dtype=np.uint8), np.array(crange[0], dtype=np.uint8),
-    #     np.array(crange[1], dtype=np.uint8))[0])/255
-    #print(len(fdata), featinrange, len(bgdata), bginrange)
-    return (float(featinrange)/len(fdata), 0)#(float(featinrange)/len(fdata), float(featinrange)/(featinrange + bginrange))
+def inRange(crange, data):
+    return (sum(cv2.inRange(np.array([data], dtype=np.uint8), np.array(crange[0], dtype=np.uint8),
+        np.array(crange[1], dtype=np.uint8))[0])/255)/float(len(data))
 
-def calibrate(filename, mode, colors, minfeat = .8, minratio = .5):
+def calibrate(filename, mode, colors, minfeat = .7, minratio = .5):
     clicks = []
     rclicks = []
     featuredata = []
@@ -70,17 +66,16 @@ def calibrate(filename, mode, colors, minfeat = .8, minratio = .5):
                 [max([x[0] for x in featuredata]), max([x[1] for x in featuredata]), max([x[2] for x in featuredata])]]
 
     #Seperate feature data by clustering hues
-    #NOTE: Currently assumes only one color
     if colors == 0:
         #TODO:Probably a hue histrogram and peak finding to count colors
         colors = 1
     
     #Do a k-means cluster in order to get appropriate color groups
-    centroids, labels = kmeans2(featuredata, colors, )
+    centroids, labels = kmeans2(np.array(featuredata), colors)
     colorgroups = [[] for i in range(colors)]
     [colorgroups[d].append(featuredata[n]) for n,d in enumerate(labels)]
     
-    print(inRange([[7, 80, 200],[25, 255, 255]], featuredata, backgrounddata))
+    #print(inRange([[7, 80, 200],[25, 255, 255]], featuredata))
 
     #from matplotlib import pyplot as pplot
     #pplot.scatter([p[0] for p in backgrounddata], [p[1] for p in backgrounddata], c='b')
@@ -88,29 +83,28 @@ def calibrate(filename, mode, colors, minfeat = .8, minratio = .5):
     #pplot.show()
 
     #Expand a region around the centroid to optimize feature detection
+    colorranges = []
     for c, cg in zip(centroids, colorgroups):
-        colorrange = [[c[0]-2, c[1]-2, c[2]-2],[c[0]+2, c[1]+2, c[2]+2]]
-        pf, ps = inRange(colorrange, featuredata, backgrounddata)
-        while pf < minfeat:
-            pf1, ps1 = inRange([[max(colorrange[0][0]-2,0), colorrange[0][1], colorrange[0][2]],
-                [min(colorrange[1][0]+2, 180), colorrange[1][1], colorrange[1][2]]], featuredata, backgrounddata)
-            pf2, ps2 = inRange([[colorrange[0][0], max(colorrange[0][1]-2, 0), colorrange[0][2]],
-                [colorrange[1][0], min(colorrange[1][1]+2, 255), colorrange[1][2]]], featuredata, backgrounddata)
-            pf3, ps3 = inRange([[colorrange[0][0], colorrange[0][1], max(colorrange[0][2]-2, 0)],
-                [colorrange[1][0], colorrange[1][1], min(colorrange[1][2]+2, 255)]], featuredata, backgrounddata)
-            if pf1 >= pf2 and pf1 >= pf3:
-                colorrange[0][0] = max(colorrange[0][0]-2, 0)
-                colorrange[1][0] = min(colorrange[1][0]+2, 180)
-                pf = pf1
-            elif pf2 >= pf1 and pf2 >= pf3:
-                colorrange[0][1] = max(colorrange[0][1]-2, 0)
-                colorrange[1][1] = min(colorrange[1][1]+2, 255)
-                pf = pf2
+        colorrange = [[c[0]-1, c[1]-1, c[2]-1],[c[0]+1, c[1]+1, c[2]+1]]
+        score = inRange(colorrange, featuredata)
+        while score < minfeat:
+            score1 = inRange([[max(colorrange[0][0]-1,0), colorrange[0][1], colorrange[0][2]],
+                [min(colorrange[1][0]+1, 180), colorrange[1][1], colorrange[1][2]]], featuredata)
+            score2 = inRange([[colorrange[0][0], max(colorrange[0][1]-1, 0), colorrange[0][2]],
+                [colorrange[1][0], min(colorrange[1][1]+1, 255), colorrange[1][2]]], featuredata)
+            score3 = inRange([[colorrange[0][0], colorrange[0][1], max(colorrange[0][2]-1, 0)],
+                [colorrange[1][0], colorrange[1][1], min(colorrange[1][2]+1, 255)]], featuredata)
+            if score1 >= score2 and score1 >= score3:
+                colorrange[0][0] = max(colorrange[0][0]-1, 0)
+                colorrange[1][0] = min(colorrange[1][0]+1, 180)
+                score = score1
+            elif score2 >= score1 and score2 >= score3:
+                colorrange[0][1] = max(colorrange[0][1]-1, 0)
+                colorrange[1][1] = min(colorrange[1][1]+1, 255)
+                score = score2
             else:
-                colorrange[0][2] = max(colorrange[0][2]-2, 0)
-                colorrange[1][2] = min(colorrange[1][2]+2, 255)
-                pf = pf3
-            print(colorrange)
-            t = cv2.inRange(img, np.array(colorrange[0], dtype = np.uint8), np.array(colorrange[1], dtype = np.uint8))
-            cv2.imshow("Calibration", t)
-    return colorrange
+                colorrange[0][2] = max(colorrange[0][2]-1, 0)
+                colorrange[1][2] = min(colorrange[1][2]+1, 255)
+                score = score3
+        colorranges.append(colorrange)
+    return colorranges

@@ -50,6 +50,21 @@ class Ball:
 
     def status(self, onespeed = 30):
         '''Determines if the ball was caught or thrown and acts accordingly'''
+
+        #Checks if ball is stuck on a background chunk
+        if len(self.positions) >= 10:
+            movement = map(lambda x: dist(x, self.positions[-1]), self.positions[-10:])
+            if max(movement) <= 10:
+                p.bgpoints.append(self.positions[-1])
+                self.positions = self.positions[:-10]
+                self.times = self.times[:-10]
+                self.dx = self.dx[:-9]
+                self.dy = self.dy[:-9]
+                self.dx2 = self.dx2[:-8]
+                self.dy2 = self.dy2[:-8]
+                print("Stuck on bg")
+                return
+
         score = 0
         for i in range(max(0, len(self.dy2)-5), len(self.dy2)):
             if self.dy2[i][1] > 0:
@@ -99,6 +114,7 @@ class Pattern:
         self.oldsnapshot = [True, True, True]
         self.throworder = []
         self.siteswap = []
+        self.bgpoints = []
 
     def updateBalls(self, frame, blobs):
         '''Matches each ball with a new contour'''
@@ -165,9 +181,9 @@ class Pattern:
         '''Draws the current siteswap at the bottom of the screen'''
         cv2.putText(f, 'Siteswap: '+str(''.join(map(str,self.siteswap))), (0,700), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2)
 
-def dist(ball, blob):
+def dist(a, b):
         '''Calculates Euclidean distance'''
-        return math.sqrt((ball[0]-blob[0])**2+(ball[1]-blob[1])**2)
+        return math.sqrt((a[0]-b[0])**2+(a[1]-b[1])**2)
 
 if __name__ == '__main__':
     import sys
@@ -198,10 +214,10 @@ if __name__ == '__main__':
         mode = 1
         if options.cal.lower() in ['smart', '2']:
             mode = 2
-        colorrange = calibrate.calibrate(options.input, mode, options.colors)
-        print('Color range used (in HSV with scales of 180, 255, and 255 respectively): '+ str(colorrange))
+        colorranges = calibrate.calibrate(options.input, mode, options.colors)
+        print('Color range used (in HSV with scales of 180, 255, and 255 respectively): '+ str(colorranges))
     else:
-        colorrange = [[6, 128, 181], [14, 240, 253]]#[[6, 77, 180],[25, 255, 255]]
+        colorranges = [[[6, 77, 180],[25, 255, 255]]] #[[[6, 128, 181], [14, 240, 253]]]#
     
     p = Pattern(3)
 
@@ -213,7 +229,7 @@ if __name__ == '__main__':
         b = cv2.GaussianBlur(f,(5,5),10)
         #Filters by color
         hsv = cv2.cvtColor(b,cv2.COLOR_BGR2HSV)
-        thresh = cv2.inRange(hsv,np.array(colorrange[0],np.uint8),np.array(colorrange[1],np.uint8))
+        thresh = reduce(cv2.bitwise_or, [cv2.inRange(hsv,np.array(colorrange[0],np.uint8),np.array(colorrange[1],np.uint8)) for colorrange in colorranges])
         #Attempts to remove background contours
         kernel = np.ones((5, 5), np.uint8)
         thresh = cv2.erode(thresh, kernel, iterations = 2)
