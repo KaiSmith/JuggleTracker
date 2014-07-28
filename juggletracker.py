@@ -1,7 +1,6 @@
 import cv2, math
 import cv2.cv as cv
 import numpy as np
-from math import sqrt
 import time
 
 class Ball:
@@ -20,7 +19,8 @@ class Ball:
         self.catches = 0
         self.hands = []
         self.lost = False
-   
+        self.suspect = True
+
     def update(self, frame, center):
         '''After choosing the correct new center for the ball, this function updates the kinetics of the ball (position, velocity, etc.)'''
         self.times.append(frame)
@@ -93,9 +93,9 @@ class Ball:
 class Pattern:
     def __init__(self, balls):
         '''Initializes the pattern's data'''
-        self.balls = balls
+        self.balls = [Ball(id = x) for x in range(1, balls+1)]
         self.active = []
-        self.n = len(balls)
+        self.n = balls
         self.oldsnapshot = [True, True, True]
         self.throworder = []
         self.siteswap = []
@@ -181,6 +181,8 @@ if __name__ == '__main__':
             or "smart" (can also use "2"). If none is used, the default orange color will be used for now.', dest = 'cal', default = None)
     parser.add_option('-b', '--balls', help = 'The numebr of balls that will be juggled. Default is 3',
             dest = 'balls', default = 3, type = 'int')
+    parser.add_option('-k', '--colors', help = 'The numebr of colors on your juggling balls. Count all colors across all balls.',
+            dest = 'colors', default = 1, type = 'int')
 
     (options, args) = parser.parse_args(sys.argv)
     
@@ -196,14 +198,12 @@ if __name__ == '__main__':
         mode = 1
         if options.cal.lower() in ['smart', '2']:
             mode = 2
-        colorrange = calibrate.calibrate(options.input, mode)
+        colorrange = calibrate.calibrate(options.input, mode, options.colors)
         print('Color range used (in HSV with scales of 180, 255, and 255 respectively): '+ str(colorrange))
     else:
         colorrange = [[6, 128, 181], [14, 240, 253]]#[[6, 77, 180],[25, 255, 255]]
     
-    balls = [Ball((255, 0, 0), 1), Ball((0, 0, 255), 2), Ball((255, 0, 255), 3)]
-
-    p = Pattern(balls)
+    p = Pattern(3)
 
     frame = 0
     while(1):
@@ -216,8 +216,8 @@ if __name__ == '__main__':
         thresh = cv2.inRange(hsv,np.array(colorrange[0],np.uint8),np.array(colorrange[1],np.uint8))
         #Attempts to remove background contours
         kernel = np.ones((5, 5), np.uint8)
-        #thresh = cv2.erode(thresh, kernel, iterations = 2)
-        #thresh = cv2.dilate(thresh, kernel, iterations = 3)
+        thresh = cv2.erode(thresh, kernel, iterations = 2)
+        thresh = cv2.dilate(thresh, kernel, iterations = 3)
         t = np.copy(thresh)
         #Finds contours in thresholded image
         contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
@@ -244,9 +244,10 @@ if __name__ == '__main__':
     #Plot kinetics data for specified ball (bn = ball.id-1 for chosen ball)
     bn = 1
     from matplotlib import pyplot as pplot
-    pplot.scatter([x for x in balls[bn].times], [x[1] for x in balls[bn].positions], c='r')
-    pplot.scatter([x[0] for x in balls[bn].dx], [x[1] for x in balls[bn].dy], c='g')
-    pplot.scatter([x[0] for x in balls[bn].dy2], [x[1] for x in balls[bn].dy2], c='b')
+    pplot.scatter([x[0] for x in p.balls[bn].positions], [x[1] for x in p.balls[bn].positions], c='r')
+    #pplot.scatter([x for x in balls[bn].times], [x[1] for x in balls[bn].positions], c='r')
+    #pplot.scatter([x[0] for x in balls[bn].dx], [x[1] for x in balls[bn].dy], c='g')
+    #pplot.scatter([x[0] for x in balls[bn].dy2], [x[1] for x in balls[bn].dy2], c='b')
     pplot.show()
 
     ### Ideal settings for claw: onespeed = 40

@@ -1,16 +1,17 @@
 import cv2
 import numpy as np
 import math
+from scipy.cluster.vq import kmeans2
 
 def inRange(crange, fdata, bgdata):
     featinrange = sum(cv2.inRange(np.array([fdata], dtype=np.uint8), np.array(crange[0], dtype=np.uint8),
         np.array(crange[1], dtype=np.uint8))[0])/255
-    bginrange = sum(cv2.inRange(np.array([bgdata], dtype=np.uint8), np.array(crange[0], dtype=np.uint8),
-        np.array(crange[1], dtype=np.uint8))[0])/255
-    print(len(fdata), featinrange, len(bgdata), bginrange)
-    return (float(featinrange)/len(fdata), float(featinrange)/(featinrange + bginrange))
+    # bginrange = sum(cv2.inRange(np.array([bgdata], dtype=np.uint8), np.array(crange[0], dtype=np.uint8),
+    #     np.array(crange[1], dtype=np.uint8))[0])/255
+    #print(len(fdata), featinrange, len(bgdata), bginrange)
+    return (float(featinrange)/len(fdata), 0)#(float(featinrange)/len(fdata), float(featinrange)/(featinrange + bginrange))
 
-def calibrate(filename, mode, minfeat = .8, minratio = .5):
+def calibrate(filename, mode, colors, minfeat = .8, minratio = .5):
     clicks = []
     rclicks = []
     featuredata = []
@@ -70,19 +71,15 @@ def calibrate(filename, mode, minfeat = .8, minratio = .5):
 
     #Seperate feature data by clustering hues
     #NOTE: Currently assumes only one color
-    colors = 1
-    colorgroups = [featuredata]
-
-    #For each cluster, find the centroid
-    centroids = []
-    for cg in colorgroups:
-        h = sum([d[0] for d in cg])/len(cg)
-        s = sum([d[1] for d in cg])/len(cg)
-        v = sum([d[2] for d in cg])/len(cg)
-        centroids.append([h, s, v])
-
-    print(centroids)
-
+    if colors == 0:
+        #TODO:Probably a hue histrogram and peak finding to count colors
+        colors = 1
+    
+    #Do a k-means cluster in order to get appropriate color groups
+    centroids, labels = kmeans2(featuredata, colors, )
+    colorgroups = [[] for i in range(colors)]
+    [colorgroups[d].append(featuredata[n]) for n,d in enumerate(labels)]
+    
     print(inRange([[7, 80, 200],[25, 255, 255]], featuredata, backgrounddata))
 
     #from matplotlib import pyplot as pplot
